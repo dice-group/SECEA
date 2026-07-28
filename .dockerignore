@@ -1,0 +1,47 @@
+# Virtual environments
+.venv
+.venv2
+.venv*/
+venv
+venv*/
+env
+env*/
+
+# IDE and version control
+.idea/
+.vscode/
+.git/
+
+# Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build and package files
+build/
+dist/
+*.egg-info/
+
+# Local caches
+.cache/
+**/.cache/
+pip-cache/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Secrets
+.env
+
+# Docker files are not needed inside the image
+Dockerfile
+.dockerignore
+
+datasets/
+logs/
+scripts/
+script_templates/
