@@ -10,13 +10,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+RUN pip install --no-cache-dir uv
 
-RUN python -m pip install --upgrade pip \
-    && python -m pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --frozen --no-dev
 
 COPY . .
 
 EXPOSE 8080
 
-CMD ["python", "main_web.py"]
+CMD ["uv", "run", "python", "main_web.py"]

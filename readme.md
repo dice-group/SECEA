@@ -4,15 +4,17 @@ This repository contains a Python implementation of the paper:
  **SECEA: Self Configuring Matcher Framework for Entity and Knowledge Graph Alignment**.
 
 ## Requirements
-
-- Python **3.10** or **3.11**
+- [uv](https://docs.astral.sh/uv/) for dependency management
 
 ## Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+Dependencies are declared in `pyproject.toml` and pinned in `uv.lock`.
 
 Clone this repository and install the dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Dataset Setup
@@ -45,7 +47,7 @@ datasets/OpenEA_dataset_v1.1/EN_FR_100K_V1/ent_links
 Then, convert the OpenEA dataset into the format required by SECEA:
 
 ```bash
-python datasets/OpenEA_dataset_v1.1/OpenEAConverter.py
+uv run datasets/OpenEA_dataset_v1.1/OpenEAConverter.py
 ```
 
 ### Expected Dataset Structure
@@ -68,7 +70,7 @@ datasets/
 To run the OAEI Knowledge Graph Alignment experiments:
 
 ```bash
-python main_oaei_local.py
+uv run main_oaei_local.py
 ```
 
 ### Entity Alignment Experiments
@@ -76,10 +78,10 @@ python main_oaei_local.py
 To run the OpenEA Entity Alignment experiments:
 
 ```bash
-python main_openea.py
+uv run main_openea.py
 ```
 
 To allow running experiments with other datasets as well, we provide a MELT (<https://dwslab.github.io/melt/http-definition>) compatible web interface on port 8080:
 ```bash
-python main_web.py
+uv run main_web.py
 ```

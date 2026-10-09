@@ -25,6 +25,10 @@ build/
 dist/
 *.egg-info/
 
+# Docker image archives
+*.tar
+*.tar.gz
+
 # Local caches
 .cache/
 **/.cache/
