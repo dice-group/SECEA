@@ -19,19 +19,21 @@ class Alignment:
         self.matched_instance_to_class_counter = MatchedInstanceToClassCounter(self.source, self.target)
         self.empty_tensor = torch.empty((0, 2), dtype=torch.long)
 
+    def propose_already_checked_matches(self, final_matches: torch.Tensor, from_which_mather: str):
+        self.source_to_target_mappings[final_matches[:, 0]] = final_matches[:, 1]
+        self.target_to_source_mappings[final_matches[:, 1]] = final_matches[:, 0]
+
+        self.matches_source_to_target = torch.cat((self.matches_source_to_target, final_matches))
+        for i in range(final_matches.shape[0]):
+            self.matches_by_which_matcher.append(from_which_mather)
+
+        self.triple_representation_counter.on_new_matches(self, final_matches)
+        self.matched_instance_to_class_counter.on_new_matches(self, final_matches)
+
     def propose_matches(self, matches: torch.Tensor, from_which_mather: str):
         final_matches = self.compute_valid_matches(matches)
         if final_matches.numel() > 0:
-            # apply matches
-            self.source_to_target_mappings[final_matches[:, 0]] = final_matches[:, 1]
-            self.target_to_source_mappings[final_matches[:, 1]] = final_matches[:, 0]
-
-            self.matches_source_to_target = torch.cat((self.matches_source_to_target, final_matches))
-            for i in range(final_matches.shape[0]):
-                self.matches_by_which_matcher.append(from_which_mather)
-
-            self.triple_representation_counter.on_new_matches(self, final_matches)
-            self.matched_instance_to_class_counter.on_new_matches(self, final_matches)
+            self.propose_already_checked_matches(final_matches, from_which_mather)
 
     def compute_valid_matches(self, matches):
         matches = matches[self.check_does_not_violate_type_matches(matches)]

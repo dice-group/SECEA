@@ -32,6 +32,7 @@ class Dataset:
         self.class_id_mask : None | torch.IntTensor = None
         self.rel_id_mask : None | torch.IntTensor = None
         self.anything_to_type_id = None
+        self.literal_cache_for_dataset_building = dict()
 
         print("Load dataset")
         byte_stream = io.BytesIO(clean_text.encode("utf-8"))
@@ -64,10 +65,13 @@ class Dataset:
 
         tail_is_literal = False
         if tail.startswith('"'):
-            tail = tail[1:-1]
             tail_is_literal = True
-            tail = tail.split("^^", 1)[0]
-            tail = unidecode(tail)
+            if tail in self.literal_cache_for_dataset_building:
+                tail = self.literal_cache_for_dataset_building[tail]
+            else:
+                processed_tail = unidecode(tail[1:-1].split("^^", 1)[0])
+                self.literal_cache_for_dataset_building[tail] = processed_tail
+                tail = processed_tail
 
         h = self._get_or_create_id(head)
         r = self._get_or_create_id(rel)
@@ -98,6 +102,7 @@ class Dataset:
     def on_done_loading(self):
         if self.add_iri_label:
             self.add_iri_labels()
+        del self.literal_cache_for_dataset_building
         self.triples_tensor = torch.tensor(self._triples_raw_list, dtype=torch.long)
         del self._triples_raw_list
         print("Created triples tensor")

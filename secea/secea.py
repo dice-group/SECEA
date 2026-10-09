@@ -16,7 +16,7 @@ from decorators import timed
 
 
 class SECEA:
-    def __init__(self, source: Dataset, target: Dataset, matcher_scoring_function = None):
+    def __init__(self, source: Dataset, target: Dataset, matcher_scoring_function=None):
         self.source = source
         self.target = target
         self.alignment = Alignment(source, target)
@@ -27,13 +27,12 @@ class SECEA:
         source_label_relations, target_label_relations = self.find_potential_label_relations()
         for element_type in ['relation', 'class']:
             label_equality_pair_counter = self.compute_pairs_with_at_least_k_unique_matching_labels(element_type,
-                                                                                                       source_label_relations,
-                                                                                                       target_label_relations)
+                                                                                                    source_label_relations,
+                                                                                                    target_label_relations)
             iterative_matcher_groups.append(
                 [IterativeMatcherMatchAllFromInput(label_equality_pair_counter[i], element_type + str(i)) for i
                  in
                  sorted(label_equality_pair_counter.keys(), reverse=True)])
-
 
         entity_label_equality_pair_counter = self.compute_pairs_with_at_least_k_unique_matching_labels('entity',
                                                                                                        source_label_relations,
@@ -41,7 +40,7 @@ class SECEA:
 
         iterative_matcher_groups.append([EqualTripleAndEqualLabelMatcher(self.alignment,
                                                                          entity_label_equality_pair_counter[
-                                                                                                           i], i) for i
+                                                                             i], i) for i
                                          in sorted(entity_label_equality_pair_counter.keys(), reverse=True)])
 
         iterative_matcher_groups.append(
@@ -99,56 +98,48 @@ class SECEA:
         target_triples = self.alignment.target.triples_tensor
         source_triples = source_triples[source_valid_entity_mask[source_triples[:, 0]]]
         target_triples = target_triples[target_valid_entity_mask[target_triples[:, 0]]]
+
+        def compute_label_maps(head_tail_literal_pair, id_to_anything):
+            labels_normal = defaultdict(set)
+            for head, literal_attribute_id in head_tail_literal_pair:
+                labels_normal[id_to_anything[literal_attribute_id].lower()].add(head)
+            labels_plural_s_removed = {k: set(v) for k, v in labels_normal.items()}
+            for head, literal_attribute_id in head_tail_literal_pair:
+                label = id_to_anything[literal_attribute_id]
+                if label.endswith('s'):
+                    label = label[:-1]
+                label = label.lower()
+                labels_plural_s_removed.setdefault(label, set()).add(head)
+            return labels_normal, labels_plural_s_removed
+
+        src_triples_rels = source_triples[:, 1]
+        src_maps = {}
+        for r in source_label_relations.tolist():
+            idx = src_triples_rels.eq(r).nonzero(as_tuple=True)[0]
+            src_maps[r] = compute_label_maps(source_triples[idx][:, (0, 2)].tolist(), self.alignment.source.id_to_anything)
+        tgt_triples_rels = target_triples[:, 1]
+        tgt_maps = {}
+        for r in target_label_relations.tolist():
+            idx = tgt_triples_rels.eq(r).nonzero(as_tuple=True)[0]
+            tgt_maps[r] = compute_label_maps(target_triples[idx][:, (0, 2)].tolist(), self.alignment.target.id_to_anything)
+
         literal_relation_index_to_matched = list()
-        for literal_relation_index, (source_literal_relation_id, target_literal_relation_id) in enumerate(
-                literal_relation_iri_pairs.tolist()):
+        for (source_literal_relation_id, target_literal_relation_id) in literal_relation_iri_pairs.tolist():
             pairs_for_this_relation = set()
-            source_literal_triples = source_triples[source_triples[:, 1] == source_literal_relation_id]
-            target_literal_triples = target_triples[target_triples[:, 1] == target_literal_relation_id]
-            source_labels_to_things = defaultdict(set)
-            target_labels_to_things = defaultdict(set)
-            for head, literal_attribute_id in source_literal_triples[:,(0,2)].tolist():
-                label = self.alignment.source.id_to_anything[literal_attribute_id]
-                label = label.lower()
-                source_labels_to_things[label].add(head)
+            src_labels_normal, src_labels_plural_s_removed = src_maps[source_literal_relation_id]
+            tgt_labels_normal, tgt_labels_plural_s_removed = tgt_maps[target_literal_relation_id]
 
-            for head, literal_attribute_id in target_literal_triples[:,(0,2)].tolist():
-                label = self.alignment.target.id_to_anything[literal_attribute_id]
-                label = label.lower()
-                target_labels_to_things[label].add(head)
-
-            for literal, source_things in source_labels_to_things.items():
+            for literal, source_things in src_labels_normal.items():
                 if len(source_things) == 1:
-                    if literal in target_labels_to_things:
-                        target_things = target_labels_to_things[literal]
-                        if len(target_things) == 1:
-                            matched_source = list(source_things)[0]
-                            matched_target = list(target_things)[0]
-                            pairs_for_this_relation.add((matched_source, matched_target))
+                    target_things = tgt_labels_normal.get(literal)
+                    if target_things is not None and len(target_things) == 1:
+                        pairs_for_this_relation.add((list(source_things)[0], list(target_things)[0]))
 
-            #Do the same with plural s removed
-            for head, literal_attribute_id in source_literal_triples[:,(0,2)].tolist():
-                label = self.alignment.source.id_to_anything[literal_attribute_id]
-                if label.endswith('s'):
-                    label = label[:-1]
-                label = label.lower()
-                source_labels_to_things[label].add(head)
-
-            for head, literal_attribute_id in target_literal_triples[:,(0,2)].tolist():
-                label = self.alignment.target.id_to_anything[literal_attribute_id]
-                if label.endswith('s'):
-                    label = label[:-1]
-                label = label.lower()
-                target_labels_to_things[label].add(head)
-
-            for literal, source_things in source_labels_to_things.items():
+            for literal, source_things in src_labels_plural_s_removed.items():
                 if len(source_things) == 1:
-                    if literal in target_labels_to_things:
-                        target_things = target_labels_to_things[literal]
-                        if len(target_things) == 1:
-                            matched_source = list(source_things)[0]
-                            matched_target = list(target_things)[0]
-                            pairs_for_this_relation.add((matched_source, matched_target))
+                    target_things = tgt_labels_plural_s_removed.get(literal)
+                    if target_things is not None and len(target_things) == 1:
+                        pairs_for_this_relation.add((list(source_things)[0], list(target_things)[0]))
 
             literal_relation_index_to_matched.extend(pairs_for_this_relation)
         pair_counter = Counter()
@@ -195,7 +186,7 @@ def find_potential_label_relations(dataset: Dataset):
         num_unique_literals = torch.unique(rel_literals).numel()
         injectivity = (num_unique_literals - 1) / (n - 1)
 
-        if injectivity < 0.95: #Must have at least 95% unique tails
+        if injectivity < 0.95:  # Must have at least 95% unique tails
             continue
 
         rel_name = dataset.id_to_rel.get(rel_id)
@@ -218,39 +209,31 @@ def compute_pairs_with_tf_idf_word_literals(
         max_df: float = 0.01,
         min_df_count: int = 2,
 ) -> dict[float, torch.Tensor]:
-    # --- literal triples ---
     source_literal_triples = source.triples_tensor[source.literal_id_mask[source.triples_tensor[:, 2]]]
     target_literal_triples = target.triples_tensor[target.literal_id_mask[target.triples_tensor[:, 2]]]
 
-    # --- per-entity word sets / TF ---
     src_entity_words = defaultdict(set)
-    tgt_entity_words = defaultdict(set)
     tgt_tf = defaultdict(Counter)
 
-    # --- Source ---
     for head_id, _, literal_id in source_literal_triples.tolist():
         words = source.id_to_literal[literal_id].lower().split()
         if words:
             src_entity_words[head_id].update(words)
 
-    # --- Target ---
     for head_id, _, literal_id in target_literal_triples.tolist():
         words = target.id_to_literal[literal_id].lower().split()
-        if not words:
-            continue
-        tgt_tf[head_id].update(words)
-        tgt_entity_words[head_id].update(words)
+        if words:
+            tgt_tf[head_id].update(words)
 
-    # --- DF ---
-    document_count = len(src_entity_words) + len(tgt_entity_words)
+    document_count = len(src_entity_words) + len(tgt_tf)
     if document_count == 0:
         return {}
 
     df = Counter()
-    for wset in src_entity_words.values():
-        df.update(wset)
-    for wset in tgt_entity_words.values():
-        df.update(wset)
+    for words in src_entity_words.values():
+        df.update(words)
+    for tf_counter in tgt_tf.values():
+        df.update(tf_counter.keys())
 
     if not df:
         return {}
@@ -262,18 +245,19 @@ def compute_pairs_with_tf_idf_word_literals(
 
     idf = {w: (math.log((document_count + 1.0) / (df[w] + 1.0)) + 1.0) for w in allowed_words}
 
-    # --- Inverted index (filtered) ---
-    literal_word_dict_source = defaultdict(list)
-    for s_ent, wset in src_entity_words.items():
-        for w in wset:
-            if w in allowed_words:
-                literal_word_dict_source[w].append(s_ent)
+    source_ids = list(src_entity_words)
+    inverted = defaultdict(list)
 
-    if not literal_word_dict_source:
+    for source_idx, words in enumerate(src_entity_words.values()):
+        for w in words & allowed_words:
+            inverted[w].append(source_idx)
+
+    if not inverted:
         return {}
 
-    # --- Determine required sizes ---
-    min_num_entities_with_literals = min(len(src_entity_words), len(tgt_entity_words))
+    postings = {w: (idf[w], indices) for w, indices in inverted.items()}
+
+    min_num_entities_with_literals = min(len(src_entity_words), len(tgt_tf))
     fractions_sorted = sorted(fractions_of_results, reverse=True)
 
     n_by_frac: dict[float, int] = {}
@@ -289,37 +273,52 @@ def compute_pairs_with_tf_idf_word_literals(
     if max_n <= 0:
         return {frac: torch.empty((0, 2), dtype=torch.long) for frac in fractions_sorted}
 
-    # --- Bounded heap instead of global pair_scores ---
-    heap = []  # min-heap of (score, (s_ent, t_ent))
+    scores = [0.0] * len(source_ids)
+    heap = []
+    heap_full = False
+    cutoff = 0.0
 
     for t_ent, tf_counter in tgt_tf.items():
-
-        local_scores = defaultdict(float)
+        touched = []
 
         for w, tf_w in tf_counter.items():
-            if w not in allowed_words:
+            posting = postings.get(w)
+            if posting is None:
                 continue
-            src_ents = literal_word_dict_source.get(w)
-            if not src_ents:
-                continue
-            weight = tf_w * idf[w]
-            for s_ent in src_ents:
-                local_scores[s_ent] += weight
 
-        for s_ent, score in local_scores.items():
-            if len(heap) < max_n:
-                heapq.heappush(heap, (score, (s_ent, t_ent)))
-            else:
-                if score > heap[0][0]:
-                    heapq.heapreplace(heap, (score, (s_ent, t_ent)))
+            word_idf, source_indices = posting
+            weight = tf_w * word_idf
+
+            for source_idx in source_indices:
+                previous = scores[source_idx]
+
+                if previous == 0.0:
+                    touched.append(source_idx)
+
+                scores[source_idx] = previous + weight
+
+        for source_idx in touched:
+            score = scores[source_idx]
+            scores[source_idx] = 0.0
+
+            if not heap_full:
+                heapq.heappush(heap, (score, (source_ids[source_idx], t_ent)))
+
+                if len(heap) == max_n:
+                    heap_full = True
+                    cutoff = heap[0][0]
+
+            elif score > cutoff:
+                heapq.heapreplace(heap, (score, (source_ids[source_idx], t_ent)))
+                cutoff = heap[0][0]
 
     if not heap:
         return {}
 
     top_items = sorted(heap, key=lambda x: x[0], reverse=True)
-    biggest = torch.tensor([pair for (_score, pair) in top_items], dtype=torch.long)
+    biggest = torch.tensor([pair for (score, pair) in top_items], dtype=torch.long)
 
-    out: dict[float, torch.LongTensor] = {}
+    out: dict[float, torch.Tensor] = {}
     for frac in fractions_sorted:
         n = min(n_by_frac[frac], biggest.shape[0])
         out[frac] = biggest[:n]

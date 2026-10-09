@@ -68,7 +68,8 @@ class DynamicIterativeMatcherCombiner(MatcherCombiner):
 
                     valid = alignment.check_does_not_violate_one_to_one_matches(type_filtered[existing_ok])
                     if valid.any():
-                        matches_found_by_group.append((matcher, matches))
+                        matches_that_could_be_applied = type_filtered[existing_ok][valid]
+                        matches_found_by_group.append((matcher, matches, matches_that_could_be_applied))
                         break
             if len(matches_found_by_group) == 0:
                 return
@@ -86,9 +87,9 @@ class DynamicIterativeMatcherCombiner(MatcherCombiner):
                         best_id = i
                         best_score = score
 
-            chosen_matches = matches_found_by_group[best_id][1]
+            chosen = matches_found_by_group[best_id]
             previous_matches = alignment.matches_source_to_target.shape[0]
-            alignment.propose_matches(chosen_matches, matches_found_by_group[best_id][0].get_name())
+            alignment.propose_already_checked_matches(chosen[2], chosen[0].get_name())
             current_matches = alignment.matches_source_to_target.shape[0]
             matched_entities = alignment.source.entity_id_mask[alignment.matches_source_to_target[:, 0]].sum().item()
             print("Chose", matches_found_by_group[best_id][0].get_name(), "Resulted in ", current_matches - previous_matches, " new matches. Total entity matches ", matched_entities)
