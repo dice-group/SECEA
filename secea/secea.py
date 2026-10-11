@@ -184,7 +184,7 @@ def find_potential_label_relations(dataset: Dataset):
         n = rel_literals.numel()
 
         num_unique_literals = torch.unique(rel_literals).numel()
-        injectivity = (num_unique_literals - 1) / (n - 1)
+        injectivity = 1.0 if n == 1 else (num_unique_literals - 1) / (n - 1)
 
         if injectivity < 0.95:  # Must have at least 95% unique tails
             continue
