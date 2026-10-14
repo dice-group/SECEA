@@ -34,6 +34,8 @@ def lowest_number_matches(matches, alignment):
     return  -matches.shape[0]
 
 def select_matcher_scoring_function_by_id(i):
+    if i is None:
+        i = 4
     funcs =  {
         0: ratio_of_matches_that_will_actually_be_created,
         1: ratio_does_not_violate_existing_matches,
