@@ -19,20 +19,10 @@ class EqualTripleAndEqualLabelMatcher(IterativeMatcher):
     def __init__(self, alignment, entities_with_enough_common_labels, min_common_triple_representation):
         self.entities_with_enough_common_labels = entities_with_enough_common_labels
         self.min_common_triple_representation = min_common_triple_representation
-
-        if self.entities_with_enough_common_labels.numel() == 0:
-            self.num_entities_with_enough_common_labels = 0
-            return
-
-        multiplier = alignment.triple_representation_counter.key_multiplier
-        entities_with_enough_common_labels_keys = self.entities_with_enough_common_labels[:,
-                                                  0] * multiplier + self.entities_with_enough_common_labels[:, 1]
-        self.entities_with_enough_common_labels_keys_sorted, _ = torch.sort(entities_with_enough_common_labels_keys)
-        self.num_entities_with_enough_common_labels = self.entities_with_enough_common_labels_keys_sorted.numel()
+        self.num_entities_with_enough_common_labels = (entities_with_enough_common_labels.shape[0])
 
     def get_name(self):
-        return super().get_name() + " " + str(self.min_common_triple_representation) + " " + str(
-            self.entities_with_enough_common_labels.shape[0])
+        return super().get_name() + " " + str(self.min_common_triple_representation) + " " + str(self.entities_with_enough_common_labels.shape[0])
 
     def compute_matches(self, alignment: Alignment):
         super().compute_matches(alignment)
@@ -40,22 +30,13 @@ class EqualTripleAndEqualLabelMatcher(IterativeMatcher):
         if self.num_entities_with_enough_common_labels == 0:
             return alignment.empty_tensor
 
-        pairs_with_at_least_k_common = alignment.triple_representation_counter.get_pairs_with_at_least_k_common_tensor(
-            self.min_common_triple_representation
-        )
-        if pairs_with_at_least_k_common.numel() == 0:
+        counts = alignment.triple_representation_counter.common_counts_for_pairs(self.entities_with_enough_common_labels)
+
+        mask = counts >= self.min_common_triple_representation
+        if not mask.any():
             return alignment.empty_tensor
 
-        multiplier = alignment.triple_representation_counter.key_multiplier
-        pairs_with_at_least_k_common_keys = pairs_with_at_least_k_common[:,
-                                            0] * multiplier + pairs_with_at_least_k_common[:, 1]
-
-        pos = torch.searchsorted(self.entities_with_enough_common_labels_keys_sorted, pairs_with_at_least_k_common_keys)
-        valid = pos < self.num_entities_with_enough_common_labels
-        mask = torch.zeros_like(valid, dtype=torch.bool)
-        mask[valid] = (self.entities_with_enough_common_labels_keys_sorted[pos[valid]] ==
-                       pairs_with_at_least_k_common_keys[valid])
-        return pairs_with_at_least_k_common[mask]
+        return self.entities_with_enough_common_labels[mask]
 
 
 class EqualTripleMatcher(IterativeMatcher):
@@ -176,6 +157,7 @@ class IterativeMatcherClassBasedOnCommonInstances(IterativeMatcher):
         return alignment.matched_instance_to_class_counter.get_pairs_with_at_least_f_common_percentage(
             self.min_percentage)
 
+
 class SameClassAndEquivalentLabelMatcher(IterativeMatcher):
 
     def __init__(self, alignment, entities_with_enough_common_labels, number):
@@ -205,8 +187,9 @@ class SameClassAndEquivalentLabelMatcher(IterativeMatcher):
                                     device=entities_with_enough_common_labels.device)
         target_types = torch.tensor([target_type_map[e] for e in filtered_entities[:, 1].tolist()],
                                     device=entities_with_enough_common_labels.device)
-        self.source_entities_with_enough_common_labels_with_types = torch.stack([filtered_entities[:,0], source_types], dim=1) # X,2 : id->type
-        self.target_entities_with_enough_common_labels_with_types = torch.stack([filtered_entities[:,1], target_types], dim=1) # X,2 : id->type
+        self.source_entities_with_enough_common_labels_with_types = torch.stack([filtered_entities[:, 0], source_types], dim=1)  # X,2 : id->type
+        self.target_entities_with_enough_common_labels_with_types = torch.stack([filtered_entities[:, 1], target_types], dim=1)  # X,2 : id->type
+
     def get_name(self):
         return super().get_name() + " " + str(self.number)
 

@@ -302,6 +302,31 @@ class TripleEquivalenceCounter:
         mask = self.counts_unique >= k
         return self.pairs_unique[mask]
 
+    def common_counts_for_pairs(self, pairs):
+        # Only use this is there are not so many pairs
+        if self.common_dirty:
+            self.update_common_tensor()
+
+        if pairs.numel() == 0:
+            return torch.empty((0,), dtype=self.counts_common.dtype, )
+
+        base = self.pairs_common.shape[0]
+
+        indices = []
+        for source_id, target_id in pairs.tolist():
+            index = self.pair_to_index_common.get((source_id, target_id))
+            indices.append(index if index is not None and index < base else -1)
+
+        indices = torch.tensor(indices, dtype=torch.long)
+
+        counts = torch.zeros(pairs.shape[0], dtype=self.counts_common.dtype)
+
+        valid = indices >= 0
+        if valid.any():
+            counts[valid] = self.counts_common[indices[valid]]
+
+        return counts
+
 
 class MatchedInstanceToClassCounter:
     def __init__(self, source, target):
