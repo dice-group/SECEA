@@ -32,6 +32,7 @@ class Dataset:
         self.class_id_mask : None | torch.IntTensor = None
         self.rel_id_mask : None | torch.IntTensor = None
         self.anything_to_type_id = None
+        self.id_to_element_type_tensor = None
         self.literal_cache_for_dataset_building = dict()
 
         print("Load dataset")
@@ -161,3 +162,9 @@ class Dataset:
         print("Created class mask.")
         self.entity_id_mask = ~(self.class_id_mask | self.rel_id_mask | self.literal_id_mask)
         print("Created entity mask.")
+
+        # 0=entity, 1=relation, 2=class, 3=literal
+        self.id_to_element_type_tensor = torch.zeros(len(self.anything_to_id), dtype=torch.uint8)
+        self.id_to_element_type_tensor[self.rel_id_mask] = 1
+        self.id_to_element_type_tensor[self.class_id_mask] = 2
+        self.id_to_element_type_tensor[self.literal_id_mask] = 3

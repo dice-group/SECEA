@@ -42,11 +42,7 @@ class Alignment:
         return matches
 
     def check_does_not_violate_type_matches(self, matches):
-        return (
-                (self.source.entity_id_mask[matches[:, 0]] == self.target.entity_id_mask[matches[:, 1]]) &
-                (self.source.rel_id_mask[matches[:, 0]] == self.target.rel_id_mask[matches[:, 1]]) &
-                (self.source.class_id_mask[matches[:, 0]] == self.target.class_id_mask[matches[:, 1]])
-        )  # Literal mask not needed as if these three are equal, the fourth one is implied
+        return self.source.id_to_element_type_tensor[matches[:, 0]] == self.target.id_to_element_type_tensor[matches[:, 1]]
 
     def check_does_not_violate_existing_matches(self, matches: torch.Tensor,
                                                 allow_matches_inside_current_matches=False):
